@@ -72,6 +72,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-text")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("io.github.bytebeats:compose-charts:0.1.0")
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
+    implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
 
 
 

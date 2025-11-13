@@ -14,8 +14,33 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,10 +51,16 @@ import androidx.core.content.ContextCompat
 import com.example.smarttravelassistant.model.ExpenseRepository
 import com.example.smarttravelassistant.model.TravelItem
 import com.example.smarttravelassistant.model.TravelRepository
+import com.example.smarttravelassistant.network.ExchangeRateService
 import com.example.smarttravelassistant.ui.theme.ExpensesScreen
 import com.example.smarttravelassistant.ui.theme.ItineraryScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import java.util.Locale
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
+
 
 @AndroidEntryPoint
 @OptIn(ExperimentalMaterial3Api::class)
@@ -223,14 +254,20 @@ private fun ReminderScreen(
     onTestNotification: () -> Unit
 ) {
     var budgetText by remember { mutableStateOf(if (budget > 0) budget.toString() else "") }
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding)
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        ExchangeRateCard()
+
+        Spacer(Modifier.height(8.dp))
+
         Text("Trip & Budget", style = MaterialTheme.typography.titleMedium)
 
         OutlinedTextField(
@@ -285,8 +322,11 @@ private fun ReminderScreen(
         Button(onClick = onTestNotification) {
             Text("Send test notification")
         }
+
+        Spacer(Modifier.height(16.dp))
     }
 }
+
 
 @Composable
 private fun ReminderSwitchRow(
@@ -301,6 +341,102 @@ private fun ReminderSwitchRow(
     ) {
         Text(label)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+private sealed class ExchangeUiState {
+    object Loading : ExchangeUiState()
+    data class Success(val rate: Double) : ExchangeUiState()
+    data class Error(val message: String) : ExchangeUiState()
+}
+
+@Composable
+private fun ExchangeRateCard() {
+    var base by remember { mutableStateOf("SGD") }
+    var target by remember { mutableStateOf("CNY") }
+    var state by remember { mutableStateOf<ExchangeUiState>(ExchangeUiState.Loading) }
+    var expanded by remember { mutableStateOf(false) }
+    var reloadKey by remember { mutableIntStateOf(0) }
+
+    val currencyList = listOf(
+        "CNY", "USD", "EUR", "JPY", "GBP", "AUD", "MYR", "THB", "KRW", "TWD"
+    )
+
+    LaunchedEffect(base, target, reloadKey) {
+        state = ExchangeUiState.Loading
+        try {
+            val response = ExchangeRateService.api.getLatest(base, target)
+            val rate = response.rates?.get(target)
+            if (rate != null) {
+                state = ExchangeUiState.Success(rate)
+            } else {
+                state = ExchangeUiState.Error("Rate not found")
+            }
+        } catch (e: Exception) {
+            state = ExchangeUiState.Error("Network error: ${e.message}")
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Exchange Rate", style = MaterialTheme.typography.titleMedium)
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Base: $base")
+
+                Box {
+                    Button(onClick = { expanded = true }) {
+                        Text("To: $target")
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        currencyList.forEach { code ->
+                            DropdownMenuItem(
+                                text = { Text(code) },
+                                onClick = {
+                                    target = code
+                                    expanded = false
+                                    reloadKey++
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            when (val s = state) {
+                ExchangeUiState.Loading -> {
+                    Text("Loading…")
+                }
+                is ExchangeUiState.Success -> {
+                    val formatted = String.format(Locale.getDefault(), "%.3f", s.rate)
+                    Text("1 $base ≈ $formatted $target")
+                }
+                is ExchangeUiState.Error -> {
+                    Text(
+                        text = s.message,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            OutlinedButton(onClick = { reloadKey++ }) {
+                Text("Refresh")
+            }
+        }
     }
 }
 
@@ -321,15 +457,3 @@ private fun showNotification(context: Context, message: String) {
         notify(System.currentTimeMillis().toInt(), builder.build())
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

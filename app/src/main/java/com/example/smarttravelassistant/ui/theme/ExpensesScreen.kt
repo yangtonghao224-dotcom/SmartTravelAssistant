@@ -48,7 +48,7 @@ fun ExpensesScreen(
     val showEdit = viewModel.showEditDialog
     val confirmDelete = viewModel.confirmDelete
 
-    // 🌟 根据预算发通知
+
     LaunchedEffect(total, budget, notify50, notify70, notify90, notify100) {
         if (budget <= 0.0) return@LaunchedEffect
         val percent = total / budget
@@ -71,7 +71,7 @@ fun ExpensesScreen(
         }
     }
 
-    // 支持下滑
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -80,7 +80,7 @@ fun ExpensesScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        // 顶部 Summary
+
         item {
             SummaryCard(
                 budget = budget,
@@ -90,14 +90,14 @@ fun ExpensesScreen(
             )
         }
 
-        // 分类饼图
+
         if (categoryTotals.isNotEmpty()) {
             item {
                 CategorySummaryCard(categoryTotals, total)
             }
         }
 
-        // 输入框
+
         item {
             AddEditSection(
                 title = title,
@@ -113,7 +113,7 @@ fun ExpensesScreen(
             )
         }
 
-        // 列表
+
         if (items.isEmpty()) {
             item {
                 Box(
@@ -136,12 +136,12 @@ fun ExpensesScreen(
         }
     }
 
-    // 编辑弹窗
+
     if (showEdit) {
         EditDialog(viewModel)
     }
 
-    // 删除弹窗
+
     confirmDelete?.let {
         AlertDialog(
             onDismissRequest = { viewModel.confirmDelete = null },
