@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smarttravelassistant.model.CategoryTotal
 import com.example.smarttravelassistant.model.ExpenseItem
 import com.example.smarttravelassistant.model.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,19 +17,19 @@ class ExpenseViewModel @Inject constructor(
     private val repo: ExpenseRepository
 ) : ViewModel() {
 
-
     var items by mutableStateOf<List<ExpenseItem>>(emptyList())
         private set
 
     var total by mutableStateOf(0.0)
         private set
 
+    var categoryTotals by mutableStateOf<List<CategoryTotal>>(emptyList())
+        private set
 
     var title by mutableStateOf("")
     var amount by mutableStateOf("")
     var category by mutableStateOf("")
     var date by mutableStateOf("")
-
 
     var editing: ExpenseItem? by mutableStateOf(null)
     var showEditDialog by mutableStateOf(false)
@@ -41,6 +42,7 @@ class ExpenseViewModel @Inject constructor(
     fun refresh() = viewModelScope.launch {
         items = repo.getAll()
         total = repo.total()
+        categoryTotals = repo.sumByCategory()
     }
 
     fun onAddOrEdit() {
@@ -105,6 +107,7 @@ class ExpenseViewModel @Inject constructor(
             repo.clearAll()
             items = emptyList()
             total = 0.0
+            categoryTotals = emptyList()
         }
     }
 
@@ -115,6 +118,7 @@ class ExpenseViewModel @Inject constructor(
         date = ""
     }
 }
+
 
 
 

@@ -11,15 +11,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.smarttravelassistant.model.CategoryTotal
 import com.example.smarttravelassistant.model.ExpenseItem
 
 @Composable
 fun ExpensesScreen(
     padding: PaddingValues,
+    budget: Double,
+    tripName: String,
+    notify50: Boolean,
+    notify70: Boolean,
+    notify90: Boolean,
+    notify100: Boolean,
+    lastAlertLevel: Int,
+    onAlertLevelChanged: (Int) -> Unit,
+    onBudgetAlert: (Int, Double, Double) -> Unit,
     viewModel: ExpenseViewModel = hiltViewModel()
 ) {
     val items = viewModel.items
     val total = viewModel.total
+    val categoryTotals = viewModel.categoryTotals
 
     val title = viewModel.title
     val amount = viewModel.amount
@@ -30,6 +41,25 @@ fun ExpensesScreen(
     val showEdit = viewModel.showEditDialog
     val confirmDelete = viewModel.confirmDelete
 
+    LaunchedEffect(total, budget, notify50, notify70, notify90, notify100) {
+        if (budget <= 0.0) return@LaunchedEffect
+        val percent = if (budget > 0) total / budget else 0.0
+        var targetLevel = 0
+        fun checkLevel(level: Int, enabled: Boolean) {
+            if (enabled && percent >= level / 100.0 && level > targetLevel) {
+                targetLevel = level
+            }
+        }
+        checkLevel(50, notify50)
+        checkLevel(70, notify70)
+        checkLevel(90, notify90)
+        checkLevel(100, notify100)
+        if (targetLevel > 0 && targetLevel > lastAlertLevel) {
+            onBudgetAlert(targetLevel, total, budget)
+            onAlertLevelChanged(targetLevel)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -38,7 +68,9 @@ fun ExpensesScreen(
     ) {
         Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
             Row(
-                Modifier.fillMaxWidth().padding(14.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -46,10 +78,33 @@ fun ExpensesScreen(
                     Text("Expenses", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(6.dp))
                     Text("Total: $${"%.2f".format(total)}")
+                    if (budget > 0.0) {
+                        val percent = total / budget
+                        Text(
+                            "Budget: $${"%.2f".format(budget)} " +
+                                    "(${String.format("%.1f", percent * 100)}%)"
+                        )
+                    } else {
+                        Text("No budget set.")
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { viewModel.refresh() }) { Text("Refresh") }
                     OutlinedButton(onClick = { viewModel.clearAll() }) { Text("Clear all") }
+                }
+            }
+        }
+
+        if (categoryTotals.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("By Category", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    categoryTotals.forEach { ct ->
+                        CategoryRow(ct, total)
+                        Spacer(Modifier.height(4.dp))
+                    }
                 }
             }
         }
@@ -67,7 +122,6 @@ fun ExpensesScreen(
             singleLine = true
         )
         Spacer(Modifier.height(6.dp))
-
         OutlinedTextField(
             value = amount,
             onValueChange = { viewModel.amount = it },
@@ -76,7 +130,6 @@ fun ExpensesScreen(
             singleLine = true
         )
         Spacer(Modifier.height(6.dp))
-
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = category,
@@ -93,9 +146,7 @@ fun ExpensesScreen(
                 singleLine = true
             )
         }
-
         Spacer(Modifier.height(10.dp))
-
         Button(onClick = { viewModel.onAddOrEdit() }) {
             Text(if (editing == null) "Add Expense" else "Save Changes")
         }
@@ -139,11 +190,11 @@ fun ExpensesScreen(
         )
     }
 
-    confirmDelete?.let { item ->
+    confirmDelete?.let {
         AlertDialog(
             onDismissRequest = { viewModel.confirmDelete = null },
             title = { Text("Delete Expense") },
-            text = { Text("Delete \"${item.title}\"?") },
+            text = { Text("Delete \"${it.title}\"?") },
             confirmButton = {
                 TextButton(onClick = { viewModel.performDelete() }) { Text("Delete") }
             },
@@ -160,7 +211,9 @@ private fun ExpenseCard(
 ) {
     Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
         Row(
-            Modifier.fillMaxWidth().padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
             Column(Modifier.weight(1f)) {
@@ -184,5 +237,25 @@ private fun ExpenseCard(
         }
     }
 }
+
+@Composable
+private fun CategoryRow(ct: CategoryTotal, grandTotal: Double) {
+    val percent = if (grandTotal > 0) ct.total / grandTotal else 0.0
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(ct.category.ifBlank { "Uncategorised" })
+            Text(
+                "${"%.2f".format(ct.total)}  (${String.format("%.1f", percent * 100)}%)",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+
 
 

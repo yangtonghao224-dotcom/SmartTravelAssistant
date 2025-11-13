@@ -6,10 +6,12 @@ import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class TravelApplication : Application() {
+
     override fun onCreate() {
         super.onCreate()
 
         DatabaseProvider.init(this)
     }
 }
+
 
