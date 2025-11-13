@@ -97,27 +97,31 @@ ReminderScreenTest – tests Reminder screen UI rendering and basic interaction
 
 ## Project Structure
 
-app/
-  → src/
-    → main/
-      → java/com/example/smarttravelassistant/
-        → model/  (data classes, DAO, repository)
-        → network/  (Retrofit API & service)
-        → ui/theme/  (Jetpack Compose screens)
-        → MainActivity.kt
-        → TravelApplication.kt
-      → res/
-    → test/
-      → BudgetPercentageTest.kt
-      → BudgetUtilTest.kt
-      → CurrencySymbolTest.kt
-      → ExchangeFormatTest.kt
-      → SimpleViewModelTest.kt
-    → androidTest/
-      → TravelDaoTest.kt
-      → ReminderScreenTest.kt
+app → src → main → java → com.example.smarttravelassistant → model（data classes, DAO, repository）
 
+app → src → main → java → com.example.smarttravelassistant → network（Retrofit API & service）
 
+app → src → main → java → com.example.smarttravelassistant → ui → theme（Compose screens）
+
+app → src → main → java → com.example.smarttravelassistant → MainActivity.kt
+
+app → src → main → java → com.example.smarttravelassistant → TravelApplication.kt
+
+app → src → main → res
+
+app → src → test → BudgetPercentageTest.kt
+
+app → src → test → BudgetUtilTest.kt
+
+app → src → test → CurrencySymbolTest.kt
+
+app → src → test → ExchangeFormatTest.kt
+
+app → src → test → SimpleViewModelTest.kt
+
+app → src → androidTest → TravelDaoTest.kt
+
+app → src → androidTest → ReminderScreenTest.kt
 
 
 
