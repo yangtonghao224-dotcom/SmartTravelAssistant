@@ -71,6 +71,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-text")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("io.github.bytebeats:compose-charts:0.1.0")
+
 
 
 
