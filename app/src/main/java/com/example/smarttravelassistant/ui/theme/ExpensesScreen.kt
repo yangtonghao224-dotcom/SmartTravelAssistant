@@ -14,12 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.smarttravelassistant.model.CategoryTotal
 import com.example.smarttravelassistant.model.ExpenseItem
 import java.util.Locale
-import kotlin.math.min
 
 @Composable
 fun ExpensesScreen(
@@ -48,7 +48,6 @@ fun ExpensesScreen(
     val showEdit = viewModel.showEditDialog
     val confirmDelete = viewModel.confirmDelete
 
-
     LaunchedEffect(total, budget, notify50, notify70, notify90, notify100) {
         if (budget <= 0.0) return@LaunchedEffect
         val percent = total / budget
@@ -71,7 +70,6 @@ fun ExpensesScreen(
         }
     }
 
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -79,7 +77,6 @@ fun ExpensesScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-
 
         item {
             SummaryCard(
@@ -90,13 +87,11 @@ fun ExpensesScreen(
             )
         }
 
-
         if (categoryTotals.isNotEmpty()) {
             item {
                 CategorySummaryCard(categoryTotals, total)
             }
         }
-
 
         item {
             AddEditSection(
@@ -113,7 +108,6 @@ fun ExpensesScreen(
             )
         }
 
-
         if (items.isEmpty()) {
             item {
                 Box(
@@ -122,7 +116,10 @@ fun ExpensesScreen(
                         .padding(40.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No expenses yet.")
+                    Text(
+                        "No expenses yet.",
+                        modifier = Modifier.testTag("noExpensesText")
+                    )
                 }
             }
         } else {
@@ -136,11 +133,9 @@ fun ExpensesScreen(
         }
     }
 
-
     if (showEdit) {
         EditDialog(viewModel)
     }
-
 
     confirmDelete?.let {
         AlertDialog(
@@ -150,7 +145,9 @@ fun ExpensesScreen(
             confirmButton = {
                 TextButton(onClick = { viewModel.performDelete() }) { Text("Delete") }
             },
-            dismissButton = { TextButton(onClick = { viewModel.confirmDelete = null }) { Text("Cancel") } }
+            dismissButton = {
+                TextButton(onClick = { viewModel.confirmDelete = null }) { Text("Cancel") }
+            }
         )
     }
 }
@@ -163,7 +160,11 @@ private fun SummaryCard(
     onClearAll: () -> Unit
 ) {
     Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
-        Column(Modifier.padding(14.dp)) {
+        Column(
+            Modifier
+                .padding(14.dp)
+                .testTag("summaryCard")
+        ) {
             Text("My Trip", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Text("Total: $${"%.2f".format(total)}")
@@ -185,8 +186,15 @@ private fun SummaryCard(
 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onRefresh) { Text("Refresh") }
-                OutlinedButton(onClick = onClearAll) { Text("Clear all") }
+                OutlinedButton(
+                    onClick = onRefresh,
+                    modifier = Modifier.testTag("refreshExpensesButton")
+                ) { Text("Refresh") }
+
+                OutlinedButton(
+                    onClick = onClearAll,
+                    modifier = Modifier.testTag("clearAllExpensesButton")
+                ) { Text("Clear all") }
             }
         }
     }
@@ -198,7 +206,11 @@ private fun CategorySummaryCard(
     grandTotal: Double
 ) {
     Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
-        Column(Modifier.padding(14.dp)) {
+        Column(
+            Modifier
+                .padding(14.dp)
+                .testTag("categorySummaryCard")
+        ) {
             Text("By Category", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
 
@@ -275,10 +287,24 @@ private fun AddEditSection(
     Text("Add / Edit Expense", style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(6.dp))
 
-    OutlinedTextField(value = title, onValueChange = onTitle, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(
+        value = title,
+        onValueChange = onTitle,
+        label = { Text("Title") },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("expenseTitleField")
+    )
     Spacer(Modifier.height(6.dp))
 
-    OutlinedTextField(value = amount, onValueChange = onAmount, label = { Text("Amount") }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(
+        value = amount,
+        onValueChange = onAmount,
+        label = { Text("Amount") },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("expenseAmountField")
+    )
     Spacer(Modifier.height(6.dp))
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -286,18 +312,27 @@ private fun AddEditSection(
             value = category,
             onValueChange = onCategory,
             label = { Text("Category") },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .testTag("expenseCategoryField")
         )
         OutlinedTextField(
             value = date,
             onValueChange = onDate,
             label = { Text("Date (YYYY-MM-DD)") },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .testTag("expenseDateField")
         )
     }
 
     Spacer(Modifier.height(10.dp))
-    Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth()) {
+    Button(
+        onClick = onSubmit,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("expenseSubmitButton")
+    ) {
         Text(if (isEditing) "Save Changes" else "Add Expense")
     }
 }
@@ -309,10 +344,26 @@ private fun EditDialog(viewModel: ExpenseViewModel) {
         title = { Text("Edit Expense") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = viewModel.title, onValueChange = { viewModel.title = it }, label = { Text("Title") })
-                OutlinedTextField(value = viewModel.amount, onValueChange = { viewModel.amount = it }, label = { Text("Amount") })
-                OutlinedTextField(value = viewModel.category, onValueChange = { viewModel.category = it }, label = { Text("Category") })
-                OutlinedTextField(value = viewModel.date, onValueChange = { viewModel.date = it }, label = { Text("Date") })
+                OutlinedTextField(
+                    value = viewModel.title,
+                    onValueChange = { viewModel.title = it },
+                    label = { Text("Title") }
+                )
+                OutlinedTextField(
+                    value = viewModel.amount,
+                    onValueChange = { viewModel.amount = it },
+                    label = { Text("Amount") }
+                )
+                OutlinedTextField(
+                    value = viewModel.category,
+                    onValueChange = { viewModel.category = it },
+                    label = { Text("Category") }
+                )
+                OutlinedTextField(
+                    value = viewModel.date,
+                    onValueChange = { viewModel.date = it },
+                    label = { Text("Date") }
+                )
             }
         },
         confirmButton = {
@@ -330,7 +381,13 @@ private fun ExpenseCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .testTag("expenseCard_${item.id}")
+            .padding(vertical = 4.dp),
+        elevation = CardDefaults.cardElevation()
+    ) {
         Row(
             Modifier.padding(16.dp),
             verticalAlignment = Alignment.Top
@@ -344,18 +401,23 @@ private fun ExpenseCard(
 
             var menu by remember { mutableStateOf(false) }
 
-            IconButton(onClick = { menu = true }) {
+            IconButton(
+                onClick = { menu = true },
+                modifier = Modifier.testTag("expenseMenu_${item.id}")
+            ) {
                 Icon(Icons.Default.MoreVert, contentDescription = "Menu")
             }
 
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
                     text = { Text("Edit") },
-                    onClick = { menu = false; onEdit() }
+                    onClick = { menu = false; onEdit() },
+                    modifier = Modifier.testTag("expenseEdit_${item.id}")
                 )
                 DropdownMenuItem(
                     text = { Text("Delete") },
-                    onClick = { menu = false; onDelete() }
+                    onClick = { menu = false; onDelete() },
+                    modifier = Modifier.testTag("expenseDelete_${item.id}")
                 )
             }
         }

@@ -11,10 +11,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -23,15 +27,13 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,11 +58,9 @@ import com.example.smarttravelassistant.ui.theme.ExpensesScreen
 import com.example.smarttravelassistant.ui.theme.ItineraryScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 import java.util.Locale
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-
-
 
 @AndroidEntryPoint
 @OptIn(ExperimentalMaterial3Api::class)
@@ -189,14 +189,14 @@ class MainActivity : ComponentActivity() {
                         lastAlertLevel = lastAlertLevel,
                         onAlertLevelChanged = { level -> lastAlertLevel = level },
                         onBudgetAlert = { level, total, maxBudget ->
-                            val title = if (tripName.isBlank()) {
+                            val titleText = if (tripName.isBlank()) {
                                 "Budget Alert"
                             } else {
                                 "Budget Alert – $tripName"
                             }
                             val msg = "Spent ${"%.2f".format(total)} / " +
                                     "${"%.2f".format(maxBudget)} (${level}%)"
-                            showNotification(context, "$title: $msg")
+                            showNotification(context, "$titleText: $msg")
                         }
                     )
 
@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ReminderScreen(
+fun ReminderScreen(
     padding: PaddingValues,
     tripName: String,
     budget: Double,
@@ -327,7 +327,6 @@ private fun ReminderScreen(
     }
 }
 
-
 @Composable
 private fun ReminderSwitchRow(
     label: String,
@@ -344,14 +343,17 @@ private fun ReminderSwitchRow(
     }
 }
 
+
 private sealed class ExchangeUiState {
     object Loading : ExchangeUiState()
-    data class Success(val rate: Double) : ExchangeUiState()
+    data class Success(val rate: Double, val fromCache: Boolean) : ExchangeUiState()
     data class Error(val message: String) : ExchangeUiState()
 }
 
 @Composable
 private fun ExchangeRateCard() {
+    val context = LocalContext.current
+
     var base by remember { mutableStateOf("SGD") }
     var target by remember { mutableStateOf("CNY") }
     var state by remember { mutableStateOf<ExchangeUiState>(ExchangeUiState.Loading) }
@@ -367,14 +369,31 @@ private fun ExchangeRateCard() {
         state = ExchangeUiState.Loading
         try {
             val response = ExchangeRateService.api.getLatest(base, target)
-            val ratePerUnit = response.rates[target]
+            val ratePerUnit = response.rates?.get(target)
+
             if (ratePerUnit != null) {
-                state = ExchangeUiState.Success(ratePerUnit)
+                cacheRate(context, base, target, ratePerUnit)
+                state = ExchangeUiState.Success(ratePerUnit, fromCache = false)
             } else {
-                state = ExchangeUiState.Error("Rate not found")
+                val cached = getCachedRate(context, base, target)
+                if (cached != null) {
+                    state = ExchangeUiState.Success(cached, fromCache = true)
+                } else {
+                    state = ExchangeUiState.Error("Rate not found")
+                }
             }
+        } catch (e: IOException) {
+
+            val cached = getCachedRate(context, base, target)
+            state = if (cached != null) {
+                ExchangeUiState.Success(cached, fromCache = true)
+            } else {
+                ExchangeUiState.Error("No internet connection and no cached rate.")
+            }
+        } catch (e: HttpException) {
+            state = ExchangeUiState.Error("Server error (${e.code()}). Please try again later.")
         } catch (e: Exception) {
-            state = ExchangeUiState.Error("Network error: ${e.message}")
+            state = ExchangeUiState.Error("Unexpected error: ${e.localizedMessage}")
         }
     }
 
@@ -456,10 +475,25 @@ private fun ExchangeRateCard() {
                     val converted = ratePerUnit * amount
 
                     val formattedUnit = String.format(Locale.getDefault(), "%.4f", ratePerUnit)
-                    val formattedConverted = String.format(Locale.getDefault(), "%.2f", converted)
+                    val formattedConverted =
+                        String.format(Locale.getDefault(), "%.2f", converted)
 
                     Text("1 $base ($baseSymbol) ≈ $formattedUnit $target ($targetSymbol)")
-                    Text("$amount $base ($baseSymbol) ≈ $formattedConverted $target ($targetSymbol)")
+
+                    if (amount != 1.0) {
+                        Text(
+                            "$amount $base ($baseSymbol) ≈ " +
+                                    "$formattedConverted $target ($targetSymbol)"
+                        )
+                    }
+
+                    if (s.fromCache) {
+                        Text(
+                            text = "Offline: showing last saved rate",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
 
                 is ExchangeUiState.Error -> {
@@ -477,7 +511,25 @@ private fun ExchangeRateCard() {
     }
 }
 
-private fun currencySymbol(code: String): String = when (code) {
+
+private fun cacheRate(context: Context, base: String, target: String, rate: Double) {
+    val prefs = context.getSharedPreferences("exchange_cache", Context.MODE_PRIVATE)
+    val key = "${base}_$target"
+    prefs.edit()
+        .putString("${key}_value", rate.toString())
+        .putLong("${key}_time", System.currentTimeMillis())
+        .apply()
+}
+
+
+private fun getCachedRate(context: Context, base: String, target: String): Double? {
+    val prefs = context.getSharedPreferences("exchange_cache", Context.MODE_PRIVATE)
+    val key = "${base}_$target"
+    val value = prefs.getString("${key}_value", null)
+    return value?.toDoubleOrNull()
+}
+
+fun currencySymbol(code: String): String = when (code) {
     "SGD", "USD", "AUD" -> "$"
     "CNY", "JPY" -> "¥"
     "EUR" -> "€"
@@ -488,7 +540,6 @@ private fun currencySymbol(code: String): String = when (code) {
     "TWD" -> "NT$"
     else -> code
 }
-
 
 private fun showNotification(context: Context, message: String) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
