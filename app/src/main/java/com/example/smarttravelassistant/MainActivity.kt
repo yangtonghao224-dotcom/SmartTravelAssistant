@@ -23,17 +23,21 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.example.smarttravelassistant.model.DatabaseProvider
 import com.example.smarttravelassistant.model.TravelItem
 import com.example.smarttravelassistant.model.TravelRepository
-import kotlinx.coroutines.launch
-import com.example.smarttravelassistant.ui.theme.ExpensesScreen
 import com.example.smarttravelassistant.model.ExpenseRepository
+import com.example.smarttravelassistant.ui.theme.ExpensesScreen
 import com.example.smarttravelassistant.ui.theme.ItineraryScreen
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 
-
+@AndroidEntryPoint
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var travelRepository: TravelRepository
+    @Inject lateinit var expenseRepository: ExpenseRepository
 
     private val requestPostNotificationsPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -41,7 +45,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        DatabaseProvider.init(applicationContext)
         createNotificationChannel()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -56,8 +59,6 @@ class MainActivity : ComponentActivity() {
 
             var selectedTab by remember { mutableIntStateOf(0) }
             val tabs = listOf("Itinerary", "Expenses", "Reminders")
-            val expenseRepository = remember { ExpenseRepository() }
-            val repository = remember { TravelRepository() }
             var refreshToken by remember { mutableLongStateOf(0L) }
             var menuExpanded by remember { mutableStateOf(false) }
 
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
                                             onClick = {
                                                 menuExpanded = false
                                                 scope.launch {
-                                                    repository.clearAll()
+                                                    travelRepository.clearAll()
                                                     refreshToken++
                                                 }
                                             }
@@ -112,7 +113,7 @@ class MainActivity : ComponentActivity() {
                         FloatingActionButton(
                             onClick = {
                                 scope.launch {
-                                    repository.add(
+                                    travelRepository.add(
                                         TravelItem(
                                             title = "Flight to Paris",
                                             description = "SQ333 20:15",
@@ -132,13 +133,11 @@ class MainActivity : ComponentActivity() {
                 when (selectedTab) {
                     0 -> ItineraryScreen(
                         padding = padding,
-                        repository = repository,
+                        repository = travelRepository,
                         refreshToken = refreshToken
                     )
-                    1 -> ExpensesScreen(
-                        padding = padding,
-                        repository = expenseRepository
-                    )
+                    1 -> ExpensesScreen(padding = padding)
+
                     2 -> ReminderScreen(padding) {
                         showNotification(context, "Reminder ${System.currentTimeMillis()}")
                     }
