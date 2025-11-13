@@ -357,18 +357,19 @@ private fun ExchangeRateCard() {
     var state by remember { mutableStateOf<ExchangeUiState>(ExchangeUiState.Loading) }
     var expanded by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableIntStateOf(0) }
+    var amountText by remember { mutableStateOf("1") }
 
     val currencyList = listOf(
-        "CNY", "USD", "EUR", "JPY", "GBP", "AUD", "MYR", "THB", "KRW", "TWD"
+        "SGD", "CNY", "USD", "EUR", "JPY", "GBP", "AUD", "MYR", "THB", "KRW", "TWD"
     )
 
     LaunchedEffect(base, target, reloadKey) {
         state = ExchangeUiState.Loading
         try {
             val response = ExchangeRateService.api.getLatest(base, target)
-            val rate = response.rates?.get(target)
-            if (rate != null) {
-                state = ExchangeUiState.Success(rate)
+            val ratePerUnit = response.rates[target]
+            if (ratePerUnit != null) {
+                state = ExchangeUiState.Success(ratePerUnit)
             } else {
                 state = ExchangeUiState.Error("Rate not found")
             }
@@ -376,6 +377,9 @@ private fun ExchangeRateCard() {
             state = ExchangeUiState.Error("Network error: ${e.message}")
         }
     }
+
+    val baseSymbol = currencySymbol(base)
+    val targetSymbol = currencySymbol(target)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -393,11 +397,22 @@ private fun ExchangeRateCard() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Base: $base")
+                Text("Base: $base ($baseSymbol)")
+
+                OutlinedButton(
+                    onClick = {
+                        val oldBase = base
+                        base = target
+                        target = oldBase
+                        reloadKey++
+                    }
+                ) {
+                    Text("Swap")
+                }
 
                 Box {
                     Button(onClick = { expanded = true }) {
-                        Text("To: $target")
+                        Text("To: $target ($targetSymbol)")
                     }
                     DropdownMenu(
                         expanded = expanded,
@@ -417,14 +432,36 @@ private fun ExchangeRateCard() {
                 }
             }
 
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { newText ->
+                    val filtered = newText.filter { it.isDigit() || it == '.' }
+                    if (filtered.count { it == '.' } <= 1) {
+                        amountText = filtered
+                    }
+                },
+                label = { Text("Amount ($baseSymbol)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
             when (val s = state) {
                 ExchangeUiState.Loading -> {
                     Text("Loading…")
                 }
+
                 is ExchangeUiState.Success -> {
-                    val formatted = String.format(Locale.getDefault(), "%.3f", s.rate)
-                    Text("1 $base ≈ $formatted $target")
+                    val ratePerUnit = s.rate
+                    val amount = amountText.toDoubleOrNull() ?: 1.0
+                    val converted = ratePerUnit * amount
+
+                    val formattedUnit = String.format(Locale.getDefault(), "%.4f", ratePerUnit)
+                    val formattedConverted = String.format(Locale.getDefault(), "%.2f", converted)
+
+                    Text("1 $base ($baseSymbol) ≈ $formattedUnit $target ($targetSymbol)")
+                    Text("$amount $base ($baseSymbol) ≈ $formattedConverted $target ($targetSymbol)")
                 }
+
                 is ExchangeUiState.Error -> {
                     Text(
                         text = s.message,
@@ -439,6 +476,19 @@ private fun ExchangeRateCard() {
         }
     }
 }
+
+private fun currencySymbol(code: String): String = when (code) {
+    "SGD", "USD", "AUD" -> "$"
+    "CNY", "JPY" -> "¥"
+    "EUR" -> "€"
+    "GBP" -> "£"
+    "MYR" -> "RM"
+    "THB" -> "฿"
+    "KRW" -> "₩"
+    "TWD" -> "NT$"
+    else -> code
+}
+
 
 private fun showNotification(context: Context, message: String) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
